@@ -30,3 +30,20 @@ def test_run_bad_source_exits_2(tmp_path, capsys):
     code = main(["run", "   ", "--jobs-dir", str(tmp_path)])
     assert code == 2
     assert "cannot name a project" in capsys.readouterr().err
+
+
+def test_failed_job_exits_1(tmp_path, monkeypatch):
+    from showcase import cli
+    from showcase.stages import StubStage, default_stages
+
+    class Boom(StubStage):
+        def run(self, job):
+            raise RuntimeError("boom")
+
+    def broken():
+        stages = default_stages()
+        stages[0] = Boom("analyze")
+        return stages
+
+    monkeypatch.setattr(cli, "default_stages", broken)
+    assert main(["run", URL, "--jobs-dir", str(tmp_path)]) == 1

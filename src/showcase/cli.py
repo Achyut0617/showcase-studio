@@ -41,14 +41,17 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    final = None
     try:
         if args.command == "run":
             job = Job.create(args.source, args.jobs_dir)
-            _print_status(job, run_job(job, default_stages()))
+            final = run_job(job, default_stages())
+            _print_status(job, final)
         else:
             job = Job.load(args.job_dir)
             if args.command == "resume":
-                _print_status(job, run_job(job, default_stages()))
+                final = run_job(job, default_stages())
+                _print_status(job, final)
             elif args.command == "status":
                 _print_status(job)
             elif args.command == "approve":
@@ -57,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     except (JobError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    return 0
+    return 1 if final == "failed" else 0
 
 
 if __name__ == "__main__":
