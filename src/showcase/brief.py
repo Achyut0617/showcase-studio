@@ -141,5 +141,88 @@ def known_paths(ingest: dict) -> set[str]:
     return {f["path"] for f in ingest["files"]}
 
 
+class BriefError(Exception):
+    """The model's reply is not a usable brief."""
+
+
+def _extract_json(text: str) -> dict:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        text = text.rsplit("```", 1)[0]
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end < start:
+        raise BriefError("reply contains no JSON object")
+    try:
+        data = json.loads(text[start : end + 1])
+    except json.JSONDecodeError as exc:
+        raise BriefError(f"reply is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise BriefError("reply JSON is not an object")
+    return data
+
+
+def parse_brief_reply(text: str, known: set[str]) -> dict:
+    """Validate the reply; drop file references that are not in the repo.
+
+    A made-up path is a wrong claim about the code (an anti-goal), so it is removed
+    and listed under ``unverified_paths`` for the review screen rather than trusted.
+    """
+    data = _extract_json(text)
+    missing = [k for k in BRIEF_KEYS if k not in data]
+    if missing:
+        raise BriefError(f"reply is missing keys: {', '.join(missing)}")
+    for key in ("how_it_works", "architecture", "tech_stack", "entry_points",
+                "how_to_run", "notable", "open_questions"):
+        if not isinstance(data[key], list):
+            raise BriefError(f"`{key}` must be a list")
+
+    unverified: set[str] = set()
+    for comp in data["architecture"]:
+        if not isinstance(comp, dict):
+            raise BriefError("`architecture` items must be objects")
+        files = [f for f in comp.get("files", []) if isinstance(f, str)]
+        unverified.update(f for f in files if f not in known)
+        comp["files"] = [f for f in files if f in known]
+    entries = []
+    for e in data["entry_points"]:
+        if not isinstance(e, dict) or not isinstance(e.get("path"), str):
+            raise BriefError("`entry_points` items need a `path`")
+        if e["path"] in known:
+            entries.append(e)
+        else:
+            unverified.add(e["path"])
+    data["entry_points"] = entries
+    data["unverified_paths"] = sorted(unverified)
+    return {k: data[k] for k in (*BRIEF_KEYS, "unverified_paths")}
+
+
+def render_brief_md(brief: dict) -> str:
+    """Human-readable brief.md for the author and the later agents."""
+    def bullets(items: list) -> str:
+        return "\n".join(f"- {i}" for i in items) or "- (none)"
+
+    out = [f"# {brief['name']}", "", f"_{brief['one_liner']}_", "",
+           "## Problem", brief["problem"], "", "## Audience", brief["audience"], "",
+           "## How it works"]
+    out += [f"{n}. {step}" for n, step in enumerate(brief["how_it_works"], 1)] or ["(none)"]
+    out += ["", "## Architecture", "", "| Component | Files | Role |", "| --- | --- | --- |"]
+    for c in brief["architecture"]:
+        files = ", ".join(f"`{f}`" for f in c.get("files", [])) or "—"
+        out.append(f"| {c.get('component', '?')} | {files} | {c.get('role', '')} |")
+    out += ["", "## Tech stack", bullets(brief["tech_stack"]), "", "## Entry points"]
+    out += [f"- `{e['path']}` — {e.get('what', '')}" for e in brief["entry_points"]] or \
+        ["- (none)"]
+    out += ["", "## How to run"]
+    out += [f"{n}. {step}" for n, step in enumerate(brief["how_to_run"], 1)] or ["(none)"]
+    out += ["", "## Worth showing", bullets(brief["notable"]),
+            "", "## Open questions", bullets(brief["open_questions"])]
+    if brief.get("unverified_paths"):
+        out += ["", "## Removed claims",
+                "The model named these paths, which are not in the repo; they were dropped:",
+                bullets([f"`{p}`" for p in brief["unverified_paths"]])]
+    return "\n".join(out) + "\n"
+
+
 def dumps(obj: dict) -> str:
     return json.dumps(obj, indent=2, ensure_ascii=False)

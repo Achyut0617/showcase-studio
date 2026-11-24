@@ -1,4 +1,8 @@
-from showcase.brief import build_brief_prompt
+import json
+
+import pytest
+
+from showcase.brief import BriefError, build_brief_prompt, parse_brief_reply, render_brief_md
 from showcase.codemap import build_code_map
 from showcase.ingest import scan_tree
 
@@ -52,3 +56,63 @@ def test_huge_readme_cannot_crowd_out_modules(tmp_path):
     _, user = build_brief_prompt(tmp_path, ingest, cm, budget_chars=6_000)
     assert len(user.content) <= 6_000
     assert "- app/main.py" in user.content
+
+
+def good_reply(**over):
+    data = {
+        "name": "Chatty",
+        "one_liner": "A tiny chat server.",
+        "problem": "Talk to people nearby.",
+        "audience": "Students",
+        "how_it_works": ["app/main.py calls connect() in app/db.py"],
+        "architecture": [
+            {"component": "Storage", "files": ["app/db.py", "app/ghost.py"], "role": "DB"}
+        ],
+        "tech_stack": ["Python", "Flask"],
+        "entry_points": [
+            {"path": "app/main.py", "what": "python -m app.main"},
+            {"path": "server.py", "what": "invented"},
+        ],
+        "how_to_run": ["pip install -r requirements.txt"],
+        "notable": ["Relative imports"],
+        "open_questions": ["Which database?"],
+    }
+    data.update(over)
+    return data
+
+
+KNOWN = {"app/main.py", "app/db.py", "README.md"}
+
+
+def test_parse_drops_made_up_paths():
+    brief = parse_brief_reply("```json\n" + json.dumps(good_reply()) + "\n```", KNOWN)
+    assert brief["architecture"][0]["files"] == ["app/db.py"]
+    assert [e["path"] for e in brief["entry_points"]] == ["app/main.py"]
+    assert brief["unverified_paths"] == ["app/ghost.py", "server.py"]
+
+
+def test_parse_accepts_prose_around_json():
+    brief = parse_brief_reply("Here you go:\n" + json.dumps(good_reply()) + "\nThanks", KNOWN)
+    assert brief["name"] == "Chatty"
+
+
+@pytest.mark.parametrize("reply,msg", [
+    ("no json here", "no JSON object"),
+    ("{broken", "no JSON object"),
+    ('{"a": }', "not valid JSON"),
+    (json.dumps({"name": "x"}), "missing keys"),
+    (json.dumps(good_reply(tech_stack="Python")), "`tech_stack` must be a list"),
+    (json.dumps(good_reply(entry_points=[{"what": "x"}])), "need a `path`"),
+])
+def test_parse_rejects_bad_replies(reply, msg):
+    with pytest.raises(BriefError, match=msg):
+        parse_brief_reply(reply, KNOWN)
+
+
+def test_render_markdown():
+    md = render_brief_md(parse_brief_reply(json.dumps(good_reply()), KNOWN))
+    assert md.startswith("# Chatty\n\n_A tiny chat server._")
+    assert "| Storage | `app/db.py` | DB |" in md
+    assert "- `app/main.py` — python -m app.main" in md
+    assert "1. pip install -r requirements.txt" in md
+    assert "## Removed claims" in md and "`server.py`" in md
