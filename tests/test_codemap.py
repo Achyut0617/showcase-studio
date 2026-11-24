@@ -57,3 +57,32 @@ def test_sensitive_and_unparseable_files(tmp_path):
     cm = code_map(tmp_path)
     assert set(cm["modules"]) == {"ok.py", "bad.py"}
     assert list(cm["parse_errors"]) == ["bad.py"]
+
+
+def test_python_call_graph_across_files(tmp_path):
+    write(tmp_path, {
+        "app/__init__.py": "",
+        "app/db.py": "def connect():\n    pass\nclass Store:\n    def get(self):\n        pass\n",
+        "app/service.py": (
+            "from .db import connect, Store\n"
+            "import app.db\n"
+            "from app import db as dbmod\n"
+            "def helper():\n    pass\n"
+            "def run():\n"
+            "    connect()\n"
+            "    helper()\n"
+            "    app.db.connect()\n"
+            "    Store().get()\n"
+            "    print('x')\n"
+            "class Svc:\n"
+            "    def a(self):\n        self.b()\n        self.missing()\n"
+            "    def b(self):\n        pass\n"
+        ),
+    })
+    calls = {(c["from"], c["to"]) for c in code_map(tmp_path)["calls"]}
+    assert calls == {
+        ("app/service.py::run", "app/db.py::connect"),
+        ("app/service.py::run", "app/service.py::helper"),
+        ("app/service.py::run", "app/db.py::Store"),
+        ("app/service.py::Svc.a", "app/service.py::Svc.b"),
+    }

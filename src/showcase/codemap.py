@@ -97,9 +97,65 @@ def build_code_map(repo: Path, scan: dict) -> dict:
     for path, mod in modules.items():
         mod["used_by"] = sorted(src for src, dst in edges if dst == path)
 
+    calls = sorted(
+        {edge for path, mod in modules.items() if mod["language"] == "Python"
+         for edge in _python_call_edges(path, mod, modules)}
+    )
     return {
         "modules": dict(sorted(modules.items())),
+        "calls": [{"from": a, "to": b} for a, b in calls],
         "dependencies": [{"from": a, "to": b} for a, b in sorted(edges)],
         "external_packages": dict(external.most_common()),
         "parse_errors": {p: m["parse_error"] for p, m in modules.items() if m["parse_error"]},
     }
+
+
+def _python_call_edges(path: str, mod: dict, modules: dict[str, dict]) -> set[tuple[str, str]]:
+    """``file::function`` -> ``file::function`` edges for calls that land inside the repo.
+
+    Resolves local names, ``from x import f``, ``import pkg.mod`` / submodule
+    references and ``self.method``. Anything dynamic is left out rather than guessed.
+    """
+    def defined(p: str) -> set[str]:
+        return {s["name"] for s in modules[p]["symbols"]} if p in modules else set()
+
+    local = defined(path)
+    aliases: dict[str, tuple[str, str | None]] = {}
+    for imp in mod["imports"]:
+        target = imp.get("resolved")
+        if not target:
+            continue
+        if imp["names"]:
+            for n in imp["names"]:
+                if n in defined(target):
+                    aliases[n] = (target, n)
+                elif python_module_name(target).endswith(n):
+                    aliases[n] = (target, None)
+        else:
+            aliases[imp["module"]] = (target, None)
+
+    def resolve(call: str, cls: str | None) -> tuple[str, str] | None:
+        if call in local:
+            return path, call
+        if cls and call.startswith("self."):
+            name = f"{cls}.{call[len('self.'):]}"
+            return (path, name) if name in local else None
+        if call in aliases and aliases[call][1]:
+            return aliases[call]  # type: ignore[return-value]
+        parts = call.split(".")
+        for i in range(len(parts) - 1, 0, -1):
+            head, rest = ".".join(parts[:i]), ".".join(parts[i:])
+            if head in aliases:
+                target, sym = aliases[head]
+                name = f"{sym}.{rest}" if sym else rest
+                return (target, name) if name in defined(target) else None
+        return None
+
+    edges: set[tuple[str, str]] = set()
+    for sym in mod["symbols"]:
+        cls = sym["name"].split(".")[0] if sym["kind"] == "method" else None
+        for call in sym["calls"]:
+            hit = resolve(call, cls)
+            if hit:
+                edges.add((f"{path}::{sym['name']}", f"{hit[0]}::{hit[1]}"))
+    return edges
