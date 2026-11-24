@@ -100,3 +100,21 @@ def test_relative_import_beyond_top_resolves_to_nothing():
     from showcase.pyparse import resolve_import
 
     assert resolve_import({"module": "x", "names": [], "level": 5}, "a.b", False) == []
+
+
+def test_calls_recorded_per_function():
+    text = (
+        "def save(x):\n"
+        "    db.session.add(x)\n"
+        "    validate(x)\n"
+        "    validate(x)\n"
+        "    handlers[0](x)\n"
+        "class Room:\n"
+        "    def join(self, u):\n"
+        "        self.notify(u)\n"
+        "        log(u)\n"
+    )
+    syms = {s["name"]: s for s in parse_python(text)["symbols"]}
+    assert syms["save"]["calls"] == ["db.session.add", "validate"]
+    assert syms["Room.join"]["calls"] == ["log", "self.notify"]
+    assert syms["Room"]["calls"] == []

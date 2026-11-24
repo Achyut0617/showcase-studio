@@ -19,19 +19,43 @@ def _doc(node: ast.AST) -> str | None:
     return first[:_DOC_CHARS]
 
 
+def _dotted(node: ast.AST) -> str | None:
+    """``a.b.c`` for a Name/Attribute chain; None for anything dynamic (calls, subscripts)."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return ".".join(reversed(parts))
+    return None
+
+
+def _calls(func: ast.AST) -> list[str]:
+    """Names called inside one function body, as written (``helper``, ``self.save``)."""
+    seen: set[str] = set()
+    for node in ast.walk(func):
+        if isinstance(node, ast.Call):
+            name = _dotted(node.func)
+            if name:
+                seen.add(name)
+    return sorted(seen)
+
+
 def _symbols(tree: ast.Module) -> list[dict]:
     out: list[dict] = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             out.append({"name": node.name, "kind": "function", "line": node.lineno,
-                        "doc": _doc(node)})
+                        "doc": _doc(node), "calls": _calls(node)})
         elif isinstance(node, ast.ClassDef):
             out.append({"name": node.name, "kind": "class", "line": node.lineno,
-                        "doc": _doc(node)})
+                        "doc": _doc(node), "calls": []})
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     out.append({"name": f"{node.name}.{item.name}", "kind": "method",
-                                "line": item.lineno, "doc": _doc(item)})
+                                "line": item.lineno, "doc": _doc(item),
+                                "calls": _calls(item)})
     return out
 
 
