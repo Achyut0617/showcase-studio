@@ -4,8 +4,11 @@ A hybrid multi-agent system that turns any codebase into a full technical showca
 a deep explanation, documentation, a step-by-step tutorial, and a narrated demo video
 in the author's own (cloned) voice — published only after the author approves it.
 
-> **Status:** Stage 0 — Foundations. The orchestrator, job folder, resumable stage
-> pipeline, approval gate and Docker sandbox are in place; every agent is still a stub.
+> **Status:** Stage 1 — Understand + Write, in progress. The orchestrator, job folder,
+> resumable pipeline, approval gate and Docker sandbox are in place. The `analyze` stage
+> now fetches the project and writes `ingest.json` (file tree, languages, manifests,
+> sensitive files). A provider-agnostic LLM interface with a per-job budget cap is ready;
+> the provider itself is decision D-001. Every other agent is still a stub.
 
 ## How it works
 
