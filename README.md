@@ -6,9 +6,10 @@ in the author's own (cloned) voice — published only after the author approves 
 
 > **Status:** Stage 1 — Understand + Write, in progress. The orchestrator, job folder,
 > resumable pipeline, approval gate and Docker sandbox are in place. The `analyze` stage
-> now fetches the project and writes `ingest.json` (file tree, languages, manifests,
-> sensitive files). A provider-agnostic LLM interface with a per-job budget cap is ready;
-> the provider itself is decision D-001. Every other agent is still a stub.
+> fetches the project and writes `ingest.json` (file tree, languages, manifests, sensitive
+> files) and `code_map.json` (symbols, dependency graph, Python call graph, entry points,
+> hub modules). With an LLM configured it also writes `brief.json` / `brief.md`; until the
+> provider is chosen (decision D-001) that step is skipped. Every other agent is still a stub.
 
 ## How it works
 

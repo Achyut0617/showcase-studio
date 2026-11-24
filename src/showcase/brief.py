@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from showcase.llm import Message
+from showcase.llm import LLMClient, Message, UsageLog, call
 
 PROMPT_BUDGET_CHARS = 60_000
 _README_CHARS = 6_000
@@ -222,6 +222,40 @@ def render_brief_md(brief: dict) -> str:
                 "The model named these paths, which are not in the repo; they were dropped:",
                 bullets([f"`{p}`" for p in brief["unverified_paths"]])]
     return "\n".join(out) + "\n"
+
+
+BRIEF_JSON = "brief.json"
+BRIEF_MD = "brief.md"
+
+
+def generate_brief(
+    job_path: Path,
+    repo: Path,
+    ingest: dict,
+    code_map: dict,
+    client: LLMClient,
+    log: UsageLog,
+    *,
+    max_tokens: int = 4096,
+) -> dict:
+    """Ask the model for the brief, retry once on a malformed reply, write both files."""
+    messages = build_brief_prompt(repo, ingest, code_map)
+    known = known_paths(ingest)
+    result = call(client, messages, agent="analyzer.brief", log=log, max_tokens=max_tokens)
+    try:
+        brief = parse_brief_reply(result.text, known)
+    except BriefError as exc:
+        retry = [*messages, Message("assistant", result.text),
+                 Message("user", f"That reply could not be used: {exc}. "
+                                 "Reply again with only the JSON object in the given shape.")]
+        result = call(client, retry, agent="analyzer.brief.retry", log=log,
+                      max_tokens=max_tokens)
+        brief = parse_brief_reply(result.text, known)  # second failure fails the stage
+    brief["model"] = result.model
+    job_path = Path(job_path)
+    (job_path / BRIEF_JSON).write_text(dumps(brief), encoding="utf-8")
+    (job_path / BRIEF_MD).write_text(render_brief_md(brief), encoding="utf-8")
+    return brief
 
 
 def dumps(obj: dict) -> str:

@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+from showcase.brief import generate_brief
 from showcase.codemap import build_code_map
 from showcase.ingest import fetch_source, scan_tree
 from showcase.job import Job
+from showcase.llm import LLMClient, UsageLog
 
 INGEST_FILE = "ingest.json"
 CODE_MAP_FILE = "code_map.json"
@@ -21,9 +23,17 @@ CODE_MAP_FILE = "code_map.json"
 class AnalyzeStage:
     name = "analyze"
 
-    def __init__(self, fetch=fetch_source, max_file_bytes: int = 1_000_000) -> None:
+    def __init__(
+        self,
+        fetch=fetch_source,
+        max_file_bytes: int = 1_000_000,
+        llm: LLMClient | None = None,
+        budget_usd: float = 1.0,
+    ) -> None:
         self._fetch = fetch
         self._max_file_bytes = max_file_bytes
+        self._llm = llm  # None until the provider is chosen (D-001): brief is skipped
+        self._budget_usd = budget_usd
 
     def run(self, job: Job) -> None:
         repo = job.path / "input" / "repo"
@@ -62,4 +72,13 @@ class AnalyzeStage:
                 f"sensitive files (contents never sent to an LLM): "
                 f"{', '.join(scan['sensitive_files'])}"
             )
+        if self._llm is None:
+            lines.append("brief: skipped - no LLM provider configured yet (D-001)")
+        else:
+            usage = UsageLog.for_job(job.path, self._budget_usd)
+            brief = generate_brief(job.path, repo, record, code_map, self._llm, usage)
+            lines.append(f"brief: written by {brief['model']}, spent ${usage.spent_usd:.4f}")
+            if brief["unverified_paths"]:
+                dropped = ", ".join(brief["unverified_paths"])
+                lines.append(f"brief: dropped made-up paths: {dropped}")
         (job.path / "logs" / f"{self.name}.log").write_text("\n".join(lines) + "\n", "utf-8")
