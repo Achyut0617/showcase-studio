@@ -7,7 +7,9 @@ other languages still appear in ingest.json, just without symbols.
 
 from __future__ import annotations
 
+import json
 import sys
+import tomllib
 from collections import Counter
 from pathlib import Path
 
@@ -102,6 +104,7 @@ def build_code_map(repo: Path, scan: dict) -> dict:
          for edge in _python_call_edges(path, mod, modules)}
     )
     return {
+        "summary": _summary(repo, modules, edges, py_index),
         "modules": dict(sorted(modules.items())),
         "calls": [{"from": a, "to": b} for a, b in calls],
         "dependencies": [{"from": a, "to": b} for a, b in sorted(edges)],
@@ -159,3 +162,63 @@ def _python_call_edges(path: str, mod: dict, modules: dict[str, dict]) -> set[tu
             if hit:
                 edges.add((f"{path}::{sym['name']}", f"{hit[0]}::{hit[1]}"))
     return edges
+
+
+ENTRY_NAMES = frozenset({
+    "main.py", "__main__.py", "app.py", "manage.py", "wsgi.py", "asgi.py", "server.py",
+    "cli.py", "index.js", "index.ts", "main.js", "main.ts", "server.js", "server.ts",
+    "app.js", "app.ts",
+})
+
+
+def _manifest_entries(repo: Path, modules: dict, py_index: dict[str, str]) -> dict[str, str]:
+    """Entry points the project declares: package.json main/bin, pyproject scripts."""
+    found: dict[str, str] = {}
+    pkg = repo / "package.json"
+    if pkg.is_file():
+        try:
+            data = json.loads(pkg.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            data = {}
+        targets = [data.get("main")] if isinstance(data.get("main"), str) else []
+        binv = data.get("bin")
+        if isinstance(binv, str):
+            targets.append(binv)
+        elif isinstance(binv, dict):
+            targets += list(binv.values())
+        for t in targets:
+            t = str(t).removeprefix("./")
+            if t in modules:
+                found[t] = "package.json"
+    pyproject = repo / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            scripts = tomllib.loads(pyproject.read_text(encoding="utf-8")) \
+                .get("project", {}).get("scripts", {})
+        except (tomllib.TOMLDecodeError, OSError):
+            scripts = {}
+        for name, target in scripts.items():
+            mod = str(target).split(":")[0]
+            if mod in py_index:
+                found[py_index[mod]] = f"pyproject script `{name}`"
+    return found
+
+
+def _summary(repo: Path, modules: dict, edges: set[tuple[str, str]],
+             py_index: dict[str, str]) -> dict:
+    entries = _manifest_entries(repo, modules, py_index)
+    for path, mod in modules.items():
+        if mod.get("main_guard"):
+            entries.setdefault(path, "`if __name__ == \"__main__\"`")
+        elif path.split("/")[-1] in ENTRY_NAMES and path.count("/") <= 2:
+            entries.setdefault(path, "conventional name")
+    hubs = sorted(
+        ((len(m["used_by"]), p) for p, m in modules.items() if m["used_by"]), reverse=True
+    )[:5]
+    return {
+        "modules": len(modules),
+        "symbols": sum(len(m["symbols"]) for m in modules.values()),
+        "dependency_edges": len(edges),
+        "entry_points": [{"path": p, "why": w} for p, w in sorted(entries.items())],
+        "hubs": [{"path": p, "used_by": n} for n, p in hubs],
+    }

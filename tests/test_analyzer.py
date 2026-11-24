@@ -47,3 +47,14 @@ def test_analyze_passes_job_source_to_fetcher(tmp_path, sample_source):
     data = json.loads((job.path / INGEST_FILE).read_text())
     assert data["fetched"]["commit"] == "deadbeef"
     assert data["primary_language"] == "Go"
+
+
+def test_analyze_writes_code_map(tmp_path, sample_source):
+    from showcase.analyzer import CODE_MAP_FILE
+
+    job = make_job(sample_source, tmp_path)
+    AnalyzeStage().run(job)
+    cm = json.loads((job.path / CODE_MAP_FILE).read_text())
+    assert "app/main.py" in cm["modules"]
+    assert cm["summary"]["entry_points"] == [{"path": "app/main.py", "why": "conventional name"}]
+    assert "entry points: app/main.py" in (job.path / "logs" / "analyze.log").read_text()

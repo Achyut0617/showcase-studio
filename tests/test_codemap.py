@@ -86,3 +86,31 @@ def test_python_call_graph_across_files(tmp_path):
         ("app/service.py::run", "app/db.py::Store"),
         ("app/service.py::Svc.a", "app/service.py::Svc.b"),
     }
+
+
+def test_entry_points_and_hubs(tmp_path):
+    write(tmp_path, {
+        "pyproject.toml": '[project]\nname="x"\n[project.scripts]\ntool = "pkg.cli:main"\n',
+        "package.json": '{"main": "./web/index.js", "bin": {"w": "web/bin.js"}}',
+        "pkg/__init__.py": "",
+        "pkg/cli.py": "from . import core\n",
+        "pkg/core.py": "",
+        "pkg/job.py": "from . import core\n",
+        "run.py": 'import pkg.core\nif __name__ == "__main__":\n    pass\n',
+        "web/index.js": "",
+        "web/bin.js": "",
+        "deep/a/b/main.py": "",
+    })
+    s = code_map(tmp_path)["summary"]
+    entries = {e["path"]: e["why"] for e in s["entry_points"]}
+    assert entries["pkg/cli.py"] == "pyproject script `tool`"
+    assert entries["web/index.js"] == "package.json"
+    assert entries["web/bin.js"] == "package.json"
+    assert "run.py" in entries
+    assert "deep/a/b/main.py" not in entries
+    assert s["hubs"][0] == {"path": "pkg/core.py", "used_by": 3}
+
+
+def test_broken_manifests_do_not_crash(tmp_path):
+    write(tmp_path, {"package.json": "{not json", "pyproject.toml": "[[[", "a.py": ""})
+    assert code_map(tmp_path)["summary"]["entry_points"] == []

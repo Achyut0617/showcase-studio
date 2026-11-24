@@ -1,7 +1,8 @@
-"""The analyze stage. T1.2: fetch the project and write ingest.json.
+"""The analyze stage: fetch the project, map it, and describe it.
 
-Later tasks build on this: T1.3 adds parsing and the dependency/call graph,
-T1.4 turns it all into brief.json / brief.md with an LLM.
+T1.2 writes ingest.json (files, languages, manifests, sensitive files).
+T1.3 writes code_map.json (symbols, dependency graph, call graph, entry points).
+T1.4 turns these into brief.json / brief.md with an LLM.
 """
 
 from __future__ import annotations
@@ -9,10 +10,12 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+from showcase.codemap import build_code_map
 from showcase.ingest import fetch_source, scan_tree
 from showcase.job import Job
 
 INGEST_FILE = "ingest.json"
+CODE_MAP_FILE = "code_map.json"
 
 
 class AnalyzeStage:
@@ -34,6 +37,9 @@ class AnalyzeStage:
             **scan,
         }
         (job.path / INGEST_FILE).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        code_map = build_code_map(repo, scan)
+        (job.path / CODE_MAP_FILE).write_text(json.dumps(code_map, indent=2), encoding="utf-8")
+        summary = code_map["summary"]
 
         langs = ", ".join(
             f"{name} {info['lines']}" for name, info in list(scan["languages"].items())[:5]
@@ -44,7 +50,13 @@ class AnalyzeStage:
             f"primary language: {scan['primary_language']}",
             f"languages (lines): {langs or 'none'}",
             f"manifests: {', '.join(scan['manifests']) or 'none'}",
+            f"code map: {summary['modules']} modules, {summary['symbols']} symbols, "
+            f"{summary['dependency_edges']} internal imports, {len(code_map['calls'])} calls",
+            "entry points: "
+            + (", ".join(e["path"] for e in summary["entry_points"]) or "none found"),
         ]
+        if code_map["parse_errors"]:
+            lines.append(f"could not parse: {', '.join(code_map['parse_errors'])}")
         if scan["sensitive_files"]:
             lines.append(
                 f"sensitive files (contents never sent to an LLM): "
