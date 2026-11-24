@@ -1,10 +1,11 @@
-"""The fixed stage order and the stage contract. Every stage is a stub in Stage 0."""
+"""The fixed stage order and the stage contract. Stages are stubs until their task lands."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Protocol
 
+from showcase.analyzer import AnalyzeStage
 from showcase.job import Job
 
 STAGE_ORDER: tuple[str, ...] = (
@@ -57,4 +58,5 @@ class PublishStage(StubStage):
 
 
 def default_stages() -> list[Stage]:
-    return [PublishStage(n) if n == "publish" else StubStage(n) for n in STAGE_ORDER]
+    real: dict[str, Stage] = {"analyze": AnalyzeStage(), "publish": PublishStage("publish")}
+    return [real.get(n) or StubStage(n) for n in STAGE_ORDER]

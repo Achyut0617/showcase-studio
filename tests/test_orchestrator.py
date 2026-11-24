@@ -1,15 +1,19 @@
 import json
 from datetime import datetime
 
+import pytest
+
 from showcase.job import Job
 from showcase.orchestrator import approve, run_job
 from showcase.stages import STAGE_ORDER, StubStage, default_stages
 
-URL = "https://github.com/Achyut0617/NearbyConnect"
 
+@pytest.fixture
+def make_job(sample_source):
+    def _make(tmp_path):
+        return Job.create(sample_source, tmp_path / "jobs", now=datetime(2026, 11, 30, 9, 0, 0))
 
-def make_job(tmp_path):
-    return Job.create(URL, tmp_path, now=datetime(2026, 11, 30, 9, 0, 0))
+    return _make
 
 
 def test_stage_order_is_fixed():
@@ -19,7 +23,7 @@ def test_stage_order_is_fixed():
     )
 
 
-def test_full_run_waits_for_approval(tmp_path):
+def test_full_run_waits_for_approval(tmp_path, make_job):
     job = make_job(tmp_path)
     assert run_job(job, default_stages()) == "waiting_approval"
     for name in STAGE_ORDER[:-1]:
@@ -29,7 +33,7 @@ def test_full_run_waits_for_approval(tmp_path):
     assert Job.load(job.path).status_of("publish") == "waiting_approval"
 
 
-def test_approve_then_resume_finishes(tmp_path):
+def test_approve_then_resume_finishes(tmp_path, make_job):
     job = make_job(tmp_path)
     run_job(job, default_stages())
     approve(job)
@@ -44,7 +48,7 @@ class Boom(StubStage):
         raise RuntimeError("boom")
 
 
-def test_failure_stops_and_records_error(tmp_path):
+def test_failure_stops_and_records_error(tmp_path, make_job):
     job = make_job(tmp_path)
     stages = default_stages()
     stages[3] = Boom("run")
@@ -55,7 +59,7 @@ def test_failure_stops_and_records_error(tmp_path):
         assert job.status_of(name) == "pending"
 
 
-def test_resume_skips_done_and_reruns_running(tmp_path):
+def test_resume_skips_done_and_reruns_running(tmp_path, make_job):
     job = make_job(tmp_path)
     job.set_stage("analyze", "done")
     job.set_stage("research_style", "running")  # simulates a crash mid-stage
