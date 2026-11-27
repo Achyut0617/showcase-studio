@@ -81,3 +81,17 @@ def test_status_shows_stage_durations(tmp_path, capsys, sample_source):
     main(["run", sample_source, "--jobs-dir", str(tmp_path / "jobs")])
     out = capsys.readouterr().out
     assert re.search(r"analyze\s+done\s+\d+\.\ds", out)
+
+
+def test_list_shows_where_each_job_stopped(tmp_path, capsys, sample_source):
+    jobs = str(tmp_path / "jobs")
+    main(["run", sample_source, "--jobs-dir", jobs])
+    capsys.readouterr()
+    assert main(["list", "--jobs-dir", jobs]) == 0
+    out = capsys.readouterr().out
+    assert "nearbyconnect-" in out and "publish: waiting_approval" in out
+
+
+def test_list_empty_dir(tmp_path, capsys):
+    assert main(["list", "--jobs-dir", str(tmp_path / "none")]) == 0
+    assert "no jobs" in capsys.readouterr().out

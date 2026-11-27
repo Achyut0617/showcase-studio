@@ -1,4 +1,4 @@
-"""Command line: showcase run | resume | status | approve."""
+"""Command line: showcase run | resume | status | approve | list."""
 
 from __future__ import annotations
 
@@ -26,6 +26,22 @@ def _print_status(job: Job, final: str | None = None) -> None:
             print(f"next: showcase approve {job.path}  then  showcase resume {job.path}")
 
 
+def _list_jobs(jobs_dir: Path) -> None:
+    dirs = sorted(p for p in Path(jobs_dir).glob("*/job.json")) if Path(jobs_dir).is_dir() else []
+    if not dirs:
+        print(f"no jobs in {jobs_dir}")
+        return
+    for file in dirs:
+        try:
+            job = Job.load(file.parent)
+        except JobError:
+            print(f"  {file.parent.name:<40} (unreadable job.json)")
+            continue
+        current = next((n for n in STAGE_ORDER if job.status_of(n) != "done"), None)
+        state = f"{current}: {job.status_of(current)}" if current else "done"
+        print(f"  {job.path.name:<40} {state}")
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="showcase", description=__doc__)
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -33,6 +49,8 @@ def _parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="start a new job for a GitHub URL or local folder")
     run.add_argument("source")
     run.add_argument("--jobs-dir", default="jobs", type=Path)
+    ls = sub.add_parser("list", help="list jobs and where each one stopped")
+    ls.add_argument("--jobs-dir", default="jobs", type=Path)
     for name, help_text in (
         ("resume", "continue a job from its first unfinished stage"),
         ("status", "show each stage's status"),
@@ -53,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
             job = Job.create(args.source, args.jobs_dir)
             final = run_job(job, default_stages())
             _print_status(job, final)
+        elif args.command == "list":
+            _list_jobs(args.jobs_dir)
         else:
             job = Job.load(args.job_dir)
             if args.command == "resume":
