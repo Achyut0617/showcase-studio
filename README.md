@@ -34,11 +34,16 @@ pip install -e .[dev]
 
 showcase run https://github.com/Achyut0617/NearbyConnect   # walks all stages, stops before publish
 showcase status jobs/nearbyconnect-<timestamp>
-showcase approve jobs/nearbyconnect-<timestamp>
+showcase approve jobs/nearbyconnect-<timestamp>             # --by <name> to record the reviewer
 showcase resume jobs/nearbyconnect-<timestamp>              # finishes publish
+showcase list                                               # every job and where it stopped
+showcase --version
 ```
 
-Build the sandbox image (untrusted projects only ever run inside it):
+`status` prints the job's source, each stage's state and how long each finished stage took.
+
+Build the sandbox image (untrusted projects only ever run inside it, with no network,
+no capabilities and a read-only root filesystem):
 
 ```bash
 docker build -t showcase-sandbox:base sandbox/
