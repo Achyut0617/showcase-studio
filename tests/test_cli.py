@@ -1,3 +1,6 @@
+import pytest
+
+from showcase import __version__
 from showcase.cli import main
 
 
@@ -45,3 +48,10 @@ def test_failed_job_exits_1(tmp_path, monkeypatch, sample_source):
 
     monkeypatch.setattr(cli, "default_stages", broken)
     assert main(["run", sample_source, "--jobs-dir", str(tmp_path / "jobs")]) == 1
+
+
+def test_version_flag(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["--version"])
+    assert exc.value.code == 0
+    assert __version__ in capsys.readouterr().out

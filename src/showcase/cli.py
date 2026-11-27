@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from showcase import __version__
 from showcase.job import Job, JobError
 from showcase.orchestrator import approve, run_job
 from showcase.stages import STAGE_ORDER, default_stages
@@ -25,6 +26,7 @@ def _print_status(job: Job, final: str | None = None) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="showcase", description=__doc__)
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="start a new job for a GitHub URL or local folder")
     run.add_argument("source")
