@@ -40,3 +40,14 @@ def test_relative_input_dir_is_made_absolute(tmp_path, monkeypatch):
     args = docker_run_args("img", Path("input"), ["true"])
     mounts = [b for a, b in pairs(args) if a == "-v"]
     assert mounts == [f"{(tmp_path / 'input').resolve()}:/work"]
+
+
+def test_root_filesystem_is_read_only_by_default(tmp_path):
+    args = docker_run_args("img", tmp_path, ["true"])
+    assert "--read-only" in args
+    assert ("--tmpfs", "/tmp:rw,size=512m") in pairs(args)
+
+
+def test_read_only_can_be_disabled(tmp_path):
+    args = docker_run_args("img", tmp_path, ["true"], SandboxLimits(read_only=False))
+    assert "--read-only" not in args and "--tmpfs" not in args

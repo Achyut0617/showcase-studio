@@ -12,6 +12,7 @@ class SandboxLimits:
     memory: str = "4g"
     pids: int = 256
     network: bool = False
+    read_only: bool = True  # root filesystem; /tmp stays writable as a tmpfs
 
 
 def docker_run_args(
@@ -24,11 +25,14 @@ def docker_run_args(
 
     Only the job's input folder is mounted, at /work. Network is off unless
     ``limits.network`` is True. The container runs as the non-root ``runner``
-    user with every capability dropped.
+    user with every capability dropped, on a read-only root filesystem
+    unless ``limits.read_only`` is False.
     """
     args = ["docker", "run", "--rm"]
     if not limits.network:
         args += ["--network", "none"]
+    if limits.read_only:
+        args += ["--read-only", "--tmpfs", "/tmp:rw,size=512m"]
     args += [
         "--memory", limits.memory,
         "--cpus", str(limits.cpus),
