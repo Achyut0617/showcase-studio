@@ -12,6 +12,8 @@ from showcase.source import project_name_from_source
         ("git@github.com:Achyut0617/StealthLedger-v1.git", "stealthledger-v1"),
         ("/home/me/My Project", "my-project"),
         ("C:\\code\\Smart_Scholar", "smart-scholar"),
+        ("https://github.com/Achyut0617/NearbyConnect?tab=readme", "nearbyconnect"),
+        ("https://github.com/Achyut0617/NearbyConnect#readme", "nearbyconnect"),
     ],
 )
 def test_project_name(src, expected):

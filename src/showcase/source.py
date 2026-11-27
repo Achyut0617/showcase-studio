@@ -9,7 +9,7 @@ def project_name_from_source(source: str) -> str:
     Accepts https URLs, ``git@host:user/repo.git`` remotes and local paths
     (POSIX or Windows). Raises ``ValueError`` when no usable name remains.
     """
-    text = source.strip()
+    text = re.split(r"[?#]", source.strip(), maxsplit=1)[0]  # drop ?query and #fragment
     parts = [p for p in re.split(r"[/\\:]", text) if p]
     if not parts:
         raise ValueError(f"cannot name a project from source {source!r}")
