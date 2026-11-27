@@ -39,6 +39,8 @@ def _parser() -> argparse.ArgumentParser:
     ):
         sp = sub.add_parser(name, help=help_text)
         sp.add_argument("job_dir", type=Path)
+        if name == "approve":
+            sp.add_argument("--by", default="achyut", help="who approved (default: achyut)")
     return p
 
 
@@ -58,8 +60,8 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "status":
                 _print_status(job)
             elif args.command == "approve":
-                approve(job)
-                print(f"approved: {job.path}")
+                approve(job, by=args.by)
+                print(f"approved by {args.by}: {job.path}")
     except (JobError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

@@ -63,3 +63,13 @@ def test_status_shows_source(tmp_path, capsys, sample_source):
     capsys.readouterr()
     assert main(["status", job_dir]) == 0
     assert f"source: {sample_source}" in capsys.readouterr().out
+
+
+def test_approve_records_who(tmp_path, sample_source):
+    import json
+
+    main(["run", sample_source, "--jobs-dir", str(tmp_path / "jobs")])
+    job_dir = next((tmp_path / "jobs").iterdir())
+    assert main(["approve", str(job_dir), "--by", "reviewer"]) == 0
+    record = json.loads((job_dir / "publish" / "approval.json").read_text())
+    assert record["approved_by"] == "reviewer"
