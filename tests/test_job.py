@@ -63,3 +63,12 @@ def test_set_stage_records_error(tmp_path):
     assert loaded.stages["run"]["status"] == "failed"
     assert loaded.stages["run"]["error"] == "boom"
     assert "updated_at" in loaded.stages["run"]
+
+
+def test_load_rejects_unknown_stage_status(tmp_path, sample_source):
+    job = Job.create(sample_source, tmp_path / "jobs")
+    data = json.loads((job.path / "job.json").read_text())
+    data["stages"] = {"analyze": {"status": "finished"}}
+    (job.path / "job.json").write_text(json.dumps(data))
+    with pytest.raises(JobError, match="unknown status"):
+        Job.load(job.path)

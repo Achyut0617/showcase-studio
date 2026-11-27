@@ -59,6 +59,9 @@ class Job:
         file = path / JOB_FILE
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
+            for name, entry in dict(data.get("stages", {})).items():
+                if entry.get("status") not in STATUSES:
+                    raise ValueError(f"stage {name!r} has unknown status {entry.get('status')!r}")
             return cls(
                 path=path,
                 project_name=data["project_name"],
@@ -68,7 +71,7 @@ class Job:
             )
         except FileNotFoundError as exc:
             raise JobError(f"no {JOB_FILE} found in {path}") from exc
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError, ValueError) as exc:
             raise JobError(f"{file} is not a valid {JOB_FILE}: {exc}") from exc
 
     def save(self) -> None:
