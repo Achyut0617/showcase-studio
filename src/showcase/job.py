@@ -79,12 +79,16 @@ class Job:
             json.dump(data, fh, indent=2)
         os.replace(tmp, self.path / JOB_FILE)
 
-    def set_stage(self, name: str, status: str, error: str | None = None) -> None:
+    def set_stage(
+        self, name: str, status: str, error: str | None = None, seconds: float | None = None
+    ) -> None:
         if status not in STATUSES:
             raise ValueError(f"unknown stage status {status!r}; expected one of {sorted(STATUSES)}")
         entry = {"status": status, "updated_at": _now_iso()}
         if error is not None:
             entry["error"] = error
+        if seconds is not None:
+            entry["seconds"] = round(seconds, 2)
         self.stages[name] = entry
         self.save()
 

@@ -67,3 +67,10 @@ def test_resume_skips_done_and_reruns_running(tmp_path, make_job):
     assert not (job.path / "logs" / "analyze.log").exists()  # skipped
     assert (job.path / "logs" / "research_style.log").exists()  # re-run
     assert job.status_of("research_style") == "done"
+
+
+def test_finished_stages_record_duration(tmp_path, make_job):
+    job = make_job(tmp_path)
+    run_job(job, [StubStage("analyze")])
+    seconds = job.stages["analyze"]["seconds"]
+    assert isinstance(seconds, float) and seconds >= 0
