@@ -55,3 +55,11 @@ def test_version_flag(capsys):
         main(["--version"])
     assert exc.value.code == 0
     assert __version__ in capsys.readouterr().out
+
+
+def test_status_shows_source(tmp_path, capsys, sample_source):
+    main(["run", sample_source, "--jobs-dir", str(tmp_path / "jobs")])
+    job_dir = str(next((tmp_path / "jobs").iterdir()))
+    capsys.readouterr()
+    assert main(["status", job_dir]) == 0
+    assert f"source: {sample_source}" in capsys.readouterr().out

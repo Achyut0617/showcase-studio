@@ -14,6 +14,7 @@ from showcase.stages import STAGE_ORDER, default_stages
 
 def _print_status(job: Job, final: str | None = None) -> None:
     print(f"job: {job.path}")
+    print(f"source: {job.source}  (created {job.created_at})")
     for name in STAGE_ORDER:
         entry = job.stages.get(name, {})
         error = f"  ({entry['error']})" if entry.get("error") else ""
