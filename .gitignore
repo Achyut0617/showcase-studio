@@ -7,3 +7,7 @@ __pycache__/
 .env
 voice-samples/
 .superpowers/
+dist/
+build/
+.coverage
+htmlcov/
