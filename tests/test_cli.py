@@ -73,3 +73,11 @@ def test_approve_records_who(tmp_path, sample_source):
     assert main(["approve", str(job_dir), "--by", "reviewer"]) == 0
     record = json.loads((job_dir / "publish" / "approval.json").read_text())
     assert record["approved_by"] == "reviewer"
+
+
+def test_status_shows_stage_durations(tmp_path, capsys, sample_source):
+    import re
+
+    main(["run", sample_source, "--jobs-dir", str(tmp_path / "jobs")])
+    out = capsys.readouterr().out
+    assert re.search(r"analyze\s+done\s+\d+\.\ds", out)

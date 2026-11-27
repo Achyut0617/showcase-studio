@@ -18,7 +18,8 @@ def _print_status(job: Job, final: str | None = None) -> None:
     for name in STAGE_ORDER:
         entry = job.stages.get(name, {})
         error = f"  ({entry['error']})" if entry.get("error") else ""
-        print(f"  {name:<15} {job.status_of(name)}{error}")
+        took = f"  {entry['seconds']:.1f}s" if "seconds" in entry else ""
+        print(f"  {name:<15} {job.status_of(name):<17}{took}{error}")
     if final:
         print(f"status: {final}")
         if final == "waiting_approval":
