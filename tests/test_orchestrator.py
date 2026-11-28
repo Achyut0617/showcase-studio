@@ -74,3 +74,17 @@ def test_finished_stages_record_duration(tmp_path, make_job):
     run_job(job, [StubStage("analyze")])
     seconds = job.stages["analyze"]["seconds"]
     assert isinstance(seconds, float) and seconds >= 0
+
+
+def test_default_pipeline_writes_docs(tmp_path, sample_source):
+    from showcase.docs import WriteDocsStage
+    from showcase.job import Job
+    from showcase.orchestrator import run_job
+    from showcase.stages import default_stages
+
+    stages = default_stages()
+    assert any(isinstance(s, WriteDocsStage) for s in stages)
+    job = Job.create(sample_source, tmp_path / "jobs")
+    assert run_job(job, stages) == "waiting_approval"
+    assert job.status_of("write_docs") == "done"
+    assert (job.path / "docs" / "README.md").exists()

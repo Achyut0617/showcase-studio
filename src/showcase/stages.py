@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Protocol
 
 from showcase.analyzer import AnalyzeStage
+from showcase.docs import WriteDocsStage
 from showcase.job import Job
 
 STAGE_ORDER: tuple[str, ...] = (
@@ -58,5 +59,9 @@ class PublishStage(StubStage):
 
 
 def default_stages() -> list[Stage]:
-    real: dict[str, Stage] = {"analyze": AnalyzeStage(), "publish": PublishStage("publish")}
+    real: dict[str, Stage] = {
+        "analyze": AnalyzeStage(),
+        "write_docs": WriteDocsStage(),
+        "publish": PublishStage("publish"),
+    }
     return [real.get(n) or StubStage(n) for n in STAGE_ORDER]
