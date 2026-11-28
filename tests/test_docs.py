@@ -65,3 +65,23 @@ def test_render_tree_cuts_depth_and_size():
     assert "e.py" not in deep and "b/" in deep
     big = render_tree([f"f{i:03}.py" for i in range(100)], max_entries=10)
     assert big.splitlines()[-1] == "... 90 more"
+
+
+def test_dependency_diagram_draws_edges_with_safe_ids():
+    from showcase.docs import dependency_diagram
+
+    cm = {"dependencies": [{"from": "app/main.py", "to": "app/db.py"}]}
+    out = dependency_diagram(cm)
+    assert out.startswith("```mermaid\ngraph LR")
+    assert 'm_app_main_py["app/main.py"]' in out
+    assert "m_app_main_py --> m_app_db_py" in out
+
+
+def test_dependency_diagram_none_without_imports_and_caps_nodes():
+    from showcase.docs import dependency_diagram
+
+    assert dependency_diagram({"dependencies": []}) is None
+    deps = [{"from": "hub.py", "to": f"m{i}.py"} for i in range(30)]
+    out = dependency_diagram({"dependencies": deps}, max_nodes=5)
+    assert out.count('"]') == 5
+    assert "26 less-connected modules" in out

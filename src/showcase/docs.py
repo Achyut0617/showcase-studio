@@ -99,3 +99,33 @@ def render_tree(paths: list[str], max_depth: int = 3, max_entries: int = 60) -> 
     if hidden:
         lines.append(f"... {hidden} more")
     return "\n".join(lines)
+
+
+def _node_id(path: str) -> str:
+    return "m_" + "".join(c if c.isalnum() else "_" for c in path)
+
+
+def dependency_diagram(code_map: dict, max_nodes: int = 25) -> str | None:
+    """A Mermaid ``graph LR`` of internal imports, keeping the most connected modules.
+
+    Returns None when the project has no internal imports to draw.
+    """
+    edges = [(d["from"], d["to"]) for d in code_map.get("dependencies", [])]
+    if not edges:
+        return None
+    degree: dict[str, int] = {}
+    for a, b in edges:
+        degree[a] = degree.get(a, 0) + 1
+        degree[b] = degree.get(b, 0) + 1
+    keep = set(sorted(degree, key=lambda p: (-degree[p], p))[:max_nodes])
+    shown = [(a, b) for a, b in edges if a in keep and b in keep]
+    lines = ["```mermaid", "graph LR"]
+    for p in sorted(keep):
+        lines.append(f'  {_node_id(p)}["{p}"]')
+    for a, b in shown:
+        lines.append(f"  {_node_id(a)} --> {_node_id(b)}")
+    lines.append("```")
+    dropped = len(degree) - len(keep)
+    if dropped:
+        lines.append(f"\n_{dropped} less-connected modules left out of the diagram._")
+    return "\n".join(lines)
