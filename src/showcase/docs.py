@@ -317,3 +317,35 @@ def render_architecture(analysis: Analysis) -> str:
         out += ["", "## External packages", ""]
         out.append(", ".join(f"`{name}`" for name in list(ext)[:20]))
     return "\n".join(out).rstrip() + "\n"
+
+
+def render_readme(analysis: Analysis) -> str:
+    """README.md: pitch, what it does, tech stack, quick start, links to the other pages."""
+    brief = analysis.brief or {}
+    out = [f"# {analysis.name}", ""]
+    out.append(brief.get("one_liner") or TODO.format("one sentence on what this is."))
+    if brief.get("problem"):
+        out += ["", "## Why", "", brief["problem"]]
+    if brief.get("how_it_works"):
+        out += ["", "## How it works", ""]
+        out += [f"{i}. {s}" for i, s in enumerate(brief["how_it_works"], 1)]
+
+    out += ["", "## Tech stack", ""]
+    stack = brief.get("tech_stack") or [
+        f"{name} ({info.get('lines', 0)} lines)"
+        for name, info in analysis.ingest.get("languages", {}).items()
+        if info.get("kind") == "code"
+    ][:6]
+    out += [f"- {s}" for s in stack] or ["- unknown"]
+    ext = list(analysis.code_map.get("external_packages", {}))[:8]
+    if ext and not brief.get("tech_stack"):
+        out.append(f"- Libraries: {', '.join(f'`{e}`' for e in ext)}")
+
+    steps = setup_steps(analysis)
+    quick = [s.command for s in steps if s.kind == "install"][:2] + \
+        [s.command for s in steps if s.kind == "run"][:1]
+    if quick:
+        out += ["", "## Quick start", "", "```bash", *quick, "```"]
+    out += ["", "Full setup: [SETUP.md](SETUP.md) · How it is built: "
+            "[ARCHITECTURE.md](ARCHITECTURE.md)"]
+    return "\n".join(out).rstrip() + "\n"

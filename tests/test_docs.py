@@ -195,3 +195,27 @@ def test_render_architecture_uses_brief_components(tmp_path):
     md = render_architecture(load_analysis(tmp_path))
     assert "- **API** - serves requests (`app/main.py`)" in md
     assert "TODO" not in md
+
+
+def test_render_readme_without_brief_uses_facts(tmp_path):
+    from showcase.docs import render_readme
+
+    a = _analysis_with(tmp_path, {"requirements.txt": "flask\n"})
+    a.ingest["languages"] = {"Python": {"kind": "code", "lines": 120}}
+    a.code_map["external_packages"] = {"flask": 3}
+    md = render_readme(a)
+    assert "TODO (author)" in md
+    assert "- Python (120 lines)" in md and "`flask`" in md
+    assert "pip install -r requirements.txt" in md
+    assert "[SETUP.md](SETUP.md)" in md
+
+
+def test_render_readme_with_brief(tmp_path):
+    from showcase.docs import render_readme
+
+    write_analysis(tmp_path, brief={"name": "NearbyConnect", "one_liner": "Finds people nearby.",
+                                    "problem": "Hard to meet.", "how_it_works": ["a", "b"],
+                                    "tech_stack": ["FastAPI"]})
+    md = render_readme(load_analysis(tmp_path))
+    assert md.startswith("# NearbyConnect\n\nFinds people nearby.")
+    assert "1. a\n2. b" in md and "- FastAPI" in md and "TODO" not in md
