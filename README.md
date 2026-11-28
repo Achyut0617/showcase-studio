@@ -9,11 +9,12 @@ in the author's own (cloned) voice — published only after the author approves 
 > fetches the project and writes `ingest.json` (file tree, languages, manifests, sensitive
 > files) and `code_map.json` (symbols, dependency graph, Python call graph, entry points,
 > hub modules). With an LLM configured it also writes `brief.json` / `brief.md`; until the
-> provider is chosen (decision D-001) that step is skipped. The `write_docs` stage turns that
-> analysis into `docs/README.md`, `SETUP.md` and `ARCHITECTURE.md` (folder tree, Mermaid
-> dependency graph, install/run steps that cite their manifest, env var names from
-> `.env.example`). Anything only the LLM brief could say is left as a visible
-> `TODO (author)`. Every other agent is still a stub.
+> provider is chosen (decision D-001) that step is skipped. The `write_docs` stage turns
+> that analysis into `docs/README.md`, `SETUP.md`, `ARCHITECTURE.md` and `TUTORIAL.md`:
+> folder tree, Mermaid dependency graph, install/run/test steps that cite their manifest,
+> env var names from `.env.example`, and a guided read of the code in the order it runs.
+> Anything only the LLM brief could say is left as a visible `TODO (author)`. Every other
+> agent is still a stub.
 
 ## How it works
 

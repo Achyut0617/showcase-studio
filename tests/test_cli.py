@@ -105,7 +105,7 @@ def test_docs_command_rewrites_pages(tmp_path, sample_source, capsys):
     job = Job.create(sample_source, tmp_path / "jobs")
     AnalyzeStage().run(job)
     assert main(["docs", str(job.path)]) == 0
-    assert "wrote README.md, SETUP.md, ARCHITECTURE.md" in capsys.readouterr().out
+    assert "wrote README.md, SETUP.md, ARCHITECTURE.md, TUTORIAL.md" in capsys.readouterr().out
     assert (job.path / "docs" / "SETUP.md").exists()
 
 

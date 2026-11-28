@@ -1,4 +1,4 @@
-"""The docs agent (T1.5): README, SETUP and ARCHITECTURE pages for the analysed project.
+"""The docs agent (T1.5, T1.6): README, SETUP, ARCHITECTURE and TUTORIAL pages.
 
 Everything here is built from what the analyze stage wrote (ingest.json,
 code_map.json and, when an LLM is set, brief.json). Facts that come from the
@@ -350,8 +350,8 @@ def render_readme(analysis: Analysis) -> str:
         [s.command for s in steps if s.kind == "run"][:1]
     if quick:
         out += ["", "## Quick start", "", "```bash", *quick, "```"]
-    out += ["", "Full setup: [SETUP.md](SETUP.md) · How it is built: "
-            "[ARCHITECTURE.md](ARCHITECTURE.md)"]
+    out += ["", "Full setup: [SETUP.md](SETUP.md) · Step-by-step: [TUTORIAL.md](TUTORIAL.md) · "
+            "How it is built: [ARCHITECTURE.md](ARCHITECTURE.md)"]
     return "\n".join(out).rstrip() + "\n"
 
 
@@ -370,11 +370,14 @@ def provenance_footer(analysis: Analysis) -> str:
 
 def render_all(analysis: Analysis) -> dict[str, str]:
     """Every page the docs agent writes, keyed by file name, each with its footer."""
+    from showcase.tutorial import render_tutorial  # tutorial builds on this module
+
     footer = provenance_footer(analysis)
     pages = {
         "README.md": render_readme(analysis),
         "SETUP.md": render_setup(analysis),
         "ARCHITECTURE.md": render_architecture(analysis),
+        "TUTORIAL.md": render_tutorial(analysis),
     }
     return {name: text + footer for name, text in pages.items()}
 
@@ -383,7 +386,7 @@ DOCS_INDEX = "index.json"
 
 
 class WriteDocsStage:
-    """Writes README / SETUP / ARCHITECTURE into the job's docs/ folder plus an index."""
+    """Writes README / SETUP / ARCHITECTURE / TUTORIAL into the job's docs/ folder plus an index."""
 
     name = "write_docs"
 

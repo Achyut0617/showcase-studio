@@ -230,7 +230,7 @@ def test_footer_names_commit_and_brief_state(tmp_path):
     foot = provenance_footer(a)
     assert "commit `0123456789ab`" in foot and "code analysis only" in foot
     pages = render_all(a)
-    assert set(pages) == {"README.md", "SETUP.md", "ARCHITECTURE.md"}
+    assert set(pages) == {"README.md", "SETUP.md", "ARCHITECTURE.md", "TUTORIAL.md"}
     assert all(p.endswith("Review before publishing._\n") for p in pages.values())
 
 
@@ -244,7 +244,7 @@ def test_write_docs_stage_writes_pages_index_and_log(tmp_path, sample_source):
     job = Job.create(sample_source, tmp_path / "jobs", now=datetime(2026, 11, 30, 9, 0, 0))
     AnalyzeStage().run(job)
     WriteDocsStage().run(job)
-    for name in ("README.md", "SETUP.md", "ARCHITECTURE.md"):
+    for name in ("README.md", "SETUP.md", "ARCHITECTURE.md", "TUTORIAL.md"):
         assert (job.path / "docs" / name).read_text().strip()
     index = json.loads((job.path / "docs" / "index.json").read_text())
     assert index["used_brief"] is False
