@@ -219,3 +219,16 @@ def test_render_readme_with_brief(tmp_path):
     md = render_readme(load_analysis(tmp_path))
     assert md.startswith("# NearbyConnect\n\nFinds people nearby.")
     assert "1. a\n2. b" in md and "- FastAPI" in md and "TODO" not in md
+
+
+def test_footer_names_commit_and_brief_state(tmp_path):
+    from showcase.docs import provenance_footer, render_all
+
+    write_analysis(tmp_path, ingest={"source": "https://github.com/a/b", "repo_dir": "input/repo",
+                                     "fetched": {"kind": "git", "commit": "0123456789abcdef"}})
+    a = load_analysis(tmp_path)
+    foot = provenance_footer(a)
+    assert "commit `0123456789ab`" in foot and "code analysis only" in foot
+    pages = render_all(a)
+    assert set(pages) == {"README.md", "SETUP.md", "ARCHITECTURE.md"}
+    assert all(p.endswith("Review before publishing._\n") for p in pages.values())
