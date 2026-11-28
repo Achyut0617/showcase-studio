@@ -138,3 +138,24 @@ def test_env_var_names_reads_names_not_values(tmp_path):
     found = env_var_names(load_analysis(tmp_path))
     assert found == {".env.example": ["API_KEY", "DB_URL"]}
     assert "sk-real" not in json.dumps(found)
+
+
+def test_render_setup_sections_and_todos(tmp_path):
+    from showcase.docs import render_setup
+
+    a = _analysis_with(tmp_path, {"package.json": json.dumps({"scripts": {"start": "node ."}})})
+    a.ingest["languages"] = {"JavaScript": {"kind": "code", "files": 1, "lines": 3},
+                             "Markdown": {"kind": "docs", "files": 1, "lines": 1}}
+    md = render_setup(a)
+    assert md.startswith("# Setting up ")
+    assert "- JavaScript" in md and "Markdown" not in md
+    assert "npm install" in md and "npm start" in md
+    assert "_From: `package.json`._" in md
+    assert "## Test" not in md
+
+
+def test_render_setup_without_manifests_leaves_todos(tmp_path):
+    from showcase.docs import render_setup
+
+    md = render_setup(_analysis_with(tmp_path, {}))
+    assert md.count("TODO (author)") == 3

@@ -232,3 +232,40 @@ def env_var_names(analysis: Analysis) -> dict[str, list[str]]:
         if names:
             found[rel] = list(dict.fromkeys(names))
     return found
+
+TODO = "> **TODO (author):** {}"
+
+
+def render_setup(analysis: Analysis) -> str:
+    """SETUP.md: prerequisites, install, configure, run, test - each step cites its manifest."""
+    steps = setup_steps(analysis)
+    out = [f"# Setting up {analysis.name}", ""]
+    langs = [n for n, i in analysis.ingest.get("languages", {}).items() if i.get("kind") == "code"]
+    out += ["## Prerequisites", ""]
+    out += [f"- {lang}" for lang in langs[:5]] or [TODO.format("list what must be installed.")]
+    for kind, title in (("install", "Install"), ("run", "Run"), ("test", "Test")):
+        chosen = [s for s in steps if s.kind == kind]
+        if not chosen and kind == "test":
+            continue
+        out += ["", f"## {title}", ""]
+        if not chosen:
+            out.append(TODO.format(f"no manifest says how to {kind} this project."))
+            continue
+        out.append("```bash")
+        out += [s.command for s in chosen]
+        out.append("```")
+        out.append("")
+        out.append("_From: " + ", ".join(sorted({f"`{s.source}`" for s in chosen})) + "._")
+    env = env_var_names(analysis)
+    if env:
+        out += ["", "## Configuration", "",
+                "Copy the template and fill in your own values:", ""]
+        for rel, names in env.items():
+            out.append(f"`{rel}`:")
+            out.append("")
+            out += [f"- `{n}`" for n in names]
+            out.append("")
+    if analysis.brief and analysis.brief.get("how_to_run"):
+        out += ["", "## Notes from the analysis", ""]
+        out += [f"- {s}" for s in analysis.brief["how_to_run"]]
+    return "\n".join(out).rstrip() + "\n"
