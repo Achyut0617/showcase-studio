@@ -68,3 +68,19 @@ def test_render_tutorial_walks_setup_then_code(tmp_path):
     assert "- `health` (function, line 9) - Is the server alive?" in md
     assert "Leads to: `db.py`" in md
     assert "### 5.2 `db.py`" in md and "test_main" not in md
+
+
+def test_python_tests_run_from_their_app_folder(tmp_path):
+    import json
+
+    from showcase.docs import load_analysis
+    from showcase.tutorial import render_tutorial
+
+    mods = {p: {"depends_on": [], "symbols": []}
+            for p in ("src/backend/main.py", "src/backend/tests/test_api.py")}
+    (tmp_path / "ingest.json").write_text(json.dumps({"source": "x", "files": []}))
+    (tmp_path / "code_map.json").write_text(json.dumps({
+        "summary": {"entry_points": [], "hubs": []}, "modules": mods,
+        "external_packages": {"pytest": 1}}))
+    md = render_tutorial(load_analysis(tmp_path))
+    assert "(cd src/backend && pytest -q)" in md

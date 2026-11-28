@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 
+from showcase.codemap import python_source_roots
 from showcase.docs import TODO, Analysis, _first_line, env_var_names, setup_steps
 from showcase.ingest import is_remote
 
@@ -109,7 +110,10 @@ def render_tutorial(analysis: Analysis) -> str:
     tests = [s.command for s in steps if s.kind == "test"]
     has_py_tests = any(is_test_path(p) and p.endswith(".py") for p in cm.get("modules", {}))
     if not tests and has_py_tests and "pytest" in cm.get("external_packages", {}):
-        tests = ["pytest -q"]
+        roots = python_source_roots(list(cm.get("modules", {})))
+        test_root = next((r for r in roots if any(
+            is_test_path(p) and p.startswith(r + "/") for p in cm["modules"])), "")
+        tests = [f"(cd {test_root} && pytest -q)" if test_root else "pytest -q"]
     if tests:
         section("Run the tests")
         out += _code_block(tests)
@@ -124,7 +128,7 @@ def render_tutorial(analysis: Analysis) -> str:
         mod = modules.get(path, {})
         out += ["", f"### {n}.{i} `{path}`", ""]
         if path in entries:
-            out.append(f"**Start here** - an entry point (found by {entries[path]}).")
+            out += [f"**Start here** - an entry point (found by {entries[path]}).", ""]
         doc = _first_line(mod.get("doc"))
         if doc:
             out.append(doc)

@@ -207,8 +207,8 @@ def setup_steps(analysis: Analysis) -> list[Step]:
         else:
             continue
         for step in found:
-            if folder:
-                step.command = f"cd {folder} && {step.command}"
+            if folder:  # a subshell, so the next step still starts from the repo root
+                step.command = f"(cd {folder} && {step.command})"
             steps.append(step)
     return steps
 

@@ -107,9 +107,9 @@ def test_setup_steps_from_package_json_and_requirements(tmp_path):
     cmds = [(s.command, s.source, s.kind) for s in setup_steps(a)]
     assert cmds == [
         ("pip install -r requirements.txt", "requirements.txt", "install"),
-        ("cd web && npm install", "web/package.json", "install"),
-        ("cd web && npm run dev", "web/package.json", "run"),
-        ("cd web && npm run test", "web/package.json", "test"),
+        ("(cd web && npm install)", "web/package.json", "install"),
+        ("(cd web && npm run dev)", "web/package.json", "run"),
+        ("(cd web && npm run test)", "web/package.json", "test"),
     ]
 
 
