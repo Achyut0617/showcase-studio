@@ -28,14 +28,41 @@ def python_module_name(path: str) -> str:
     return ".".join(parts)
 
 
-def _python_index(paths: list[str]) -> dict[str, str]:
-    """Dotted name -> path, with ``src.`` dropped too so ``from app import x`` resolves."""
+PY_ROOT_MARKERS = frozenset({
+    "requirements.txt", "pyproject.toml", "setup.py", "setup.cfg", "Pipfile",
+    "main.py", "app.py", "manage.py", "wsgi.py", "asgi.py",
+})
+
+
+def python_source_roots(paths: list[str]) -> list[str]:
+    """Folders a Python app is run from, so its top-level imports resolve there.
+
+    A backend in ``src/backend/`` with its own requirements.txt or main.py
+    imports ``from services import x`` meaning ``src/backend/services``.
+    Deepest roots first, so the nearest one wins.
+    """
+    roots = {p.rpartition("/")[0] for p in paths
+             if "/" in p and p.rpartition("/")[2] in PY_ROOT_MARKERS}
+    return sorted(roots, key=lambda r: (-r.count("/"), r))
+
+
+def _python_index(paths: list[str], roots: list[str] = ()) -> dict[str, str]:
+    """Dotted name -> path, with ``src.`` and each source root dropped too.
+
+    Names from the repo root win; a source root only adds names not already taken.
+    """
     index: dict[str, str] = {}
     for p in paths:
         name = python_module_name(p)
         index.setdefault(name, p)
         if name.startswith("src."):
             index.setdefault(name[len("src."):], p)
+    for root in roots:
+        prefix = python_module_name(root + "/__init__.py") + "."
+        for p in paths:
+            name = python_module_name(p)
+            if name.startswith(prefix):
+                index.setdefault(name[len(prefix):], p)
     return index
 
 
@@ -63,7 +90,9 @@ def build_code_map(repo: Path, scan: dict) -> dict:
         and (f["language"] == "Python" or f["path"].endswith(JS_EXTENSIONS))
     ]
     paths = [f["path"] for f in parseable]
-    py_index = _python_index([p for p in paths if p.endswith(".py")])
+    py_paths = [p for p in paths if p.endswith(".py")]
+    roots = python_source_roots([f["path"] for f in scan["files"]])
+    py_index = _python_index(py_paths, roots)
     existing = set(paths)
 
     modules: dict[str, dict] = {}

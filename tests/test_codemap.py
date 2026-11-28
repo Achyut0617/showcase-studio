@@ -114,3 +114,29 @@ def test_entry_points_and_hubs(tmp_path):
 def test_broken_manifests_do_not_crash(tmp_path):
     write(tmp_path, {"package.json": "{not json", "pyproject.toml": "[[[", "a.py": ""})
     assert code_map(tmp_path)["summary"]["entry_points"] == []
+
+
+def test_backend_in_subfolder_resolves_its_own_top_level_imports(tmp_path):
+    from showcase.codemap import build_code_map, python_source_roots
+    from showcase.ingest import scan_tree
+
+    files = {
+        "src/backend/requirements.txt": "fastapi\n",
+        "src/backend/main.py": "from services.matching import match\nimport db\n",
+        "src/backend/db.py": "def get_db():\n    pass\n",
+        "src/backend/services/__init__.py": "",
+        "src/backend/services/matching.py": "from models.user import User\n\n"
+                                            "def match():\n    return User\n",
+        "src/backend/models/__init__.py": "",
+        "src/backend/models/user.py": "class User:\n    pass\n",
+    }
+    for rel, text in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text)
+    assert python_source_roots(list(files)) == ["src/backend"]
+    cm = build_code_map(tmp_path, scan_tree(tmp_path))
+    deps = {(d["from"], d["to"]) for d in cm["dependencies"]}
+    assert ("src/backend/main.py", "src/backend/services/matching.py") in deps
+    assert ("src/backend/main.py", "src/backend/db.py") in deps
+    assert ("src/backend/services/matching.py", "src/backend/models/user.py") in deps
+    assert {"services", "models", "db"}.isdisjoint(cm["external_packages"])
