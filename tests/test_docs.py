@@ -159,3 +159,39 @@ def test_render_setup_without_manifests_leaves_todos(tmp_path):
 
     md = render_setup(_analysis_with(tmp_path, {}))
     assert md.count("TODO (author)") == 3
+
+
+def test_render_architecture_from_code_map(tmp_path):
+    from showcase.docs import render_architecture
+
+    write_analysis(tmp_path, ingest={
+        "source": "x/NearbyConnect", "repo_dir": "input/repo", "primary_language": "Python",
+        "totals": {"files": 3, "code_lines": 40},
+        "files": [{"path": "app/main.py"}, {"path": "app/db.py"},
+                  {"path": ".env", "sensitive": True}],
+    }, code_map={
+        "summary": {"modules": 2, "symbols": 4,
+                    "entry_points": [{"path": "app/main.py", "why": "conventional name"}],
+                    "hubs": [{"path": "app/db.py", "used_by": 1}]},
+        "modules": {"app/db.py": {"docstring": "Database access.\nMore."}},
+        "dependencies": [{"from": "app/main.py", "to": "app/db.py"}],
+        "external_packages": {"flask": 2},
+    })
+    md = render_architecture(load_analysis(tmp_path))
+    assert "3 files, 40 lines of code; primary language Python" in md
+    assert "└── main.py" in md and ".env" not in md
+    assert "- `app/main.py` - found by conventional name" in md
+    assert "```mermaid" in md
+    assert "- `app/db.py` - imported by 1: Database access." in md
+    assert "`flask`" in md
+    assert "TODO (author)" in md  # no brief yet
+
+
+def test_render_architecture_uses_brief_components(tmp_path):
+    from showcase.docs import render_architecture
+
+    write_analysis(tmp_path, brief={"architecture": [
+        {"component": "API", "files": ["app/main.py"], "role": "serves requests"}]})
+    md = render_architecture(load_analysis(tmp_path))
+    assert "- **API** - serves requests (`app/main.py`)" in md
+    assert "TODO" not in md

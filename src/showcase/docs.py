@@ -269,3 +269,51 @@ def render_setup(analysis: Analysis) -> str:
         out += ["", "## Notes from the analysis", ""]
         out += [f"- {s}" for s in analysis.brief["how_to_run"]]
     return "\n".join(out).rstrip() + "\n"
+
+
+def _first_line(text: str | None) -> str:
+    return (text or "").strip().splitlines()[0] if (text or "").strip() else ""
+
+
+def render_architecture(analysis: Analysis) -> str:
+    """ARCHITECTURE.md: layout, components, entry points, dependencies, hub modules."""
+    cm, ing = analysis.code_map, analysis.ingest
+    summary = cm.get("summary", {})
+    out = [f"# {analysis.name} - Architecture", ""]
+    totals = ing.get("totals", {})
+    out.append(
+        f"{totals.get('files', 0)} files, {totals.get('code_lines', 0)} lines of code; "
+        f"primary language {ing.get('primary_language') or 'unknown'}. "
+        f"{summary.get('modules', 0)} modules parsed, {summary.get('symbols', 0)} symbols."
+    )
+    paths = [f["path"] for f in ing.get("files", []) if not f.get("sensitive")]
+    if paths:
+        out += ["", "## Layout", "", "```", render_tree(paths), "```"]
+
+    out += ["", "## Components", ""]
+    if analysis.brief and analysis.brief.get("architecture"):
+        for c in analysis.brief["architecture"]:
+            files = ", ".join(f"`{f}`" for f in c.get("files", []))
+            out.append(f"- **{c.get('component', '?')}** - {c.get('role', '')} ({files})")
+    else:
+        out.append(TODO.format("describe what each part does (needs the LLM brief, D-001)."))
+
+    entries = summary.get("entry_points", [])
+    out += ["", "## Entry points", ""]
+    out += [f"- `{e['path']}` - found by {e['why']}" for e in entries] or ["- none found"]
+
+    diagram = dependency_diagram(cm)
+    if diagram:
+        out += ["", "## Module dependencies", "", diagram]
+    hubs = summary.get("hubs", [])
+    if hubs:
+        out += ["", "## Most-used modules", ""]
+        for h in hubs:
+            doc = _first_line(cm.get("modules", {}).get(h["path"], {}).get("docstring"))
+            out.append(f"- `{h['path']}` - imported by {h['used_by']}"
+                       + (f": {doc}" if doc else ""))
+    ext = cm.get("external_packages", {})
+    if ext:
+        out += ["", "## External packages", ""]
+        out.append(", ".join(f"`{name}`" for name in list(ext)[:20]))
+    return "\n".join(out).rstrip() + "\n"
