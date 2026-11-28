@@ -9,7 +9,11 @@ in the author's own (cloned) voice — published only after the author approves 
 > fetches the project and writes `ingest.json` (file tree, languages, manifests, sensitive
 > files) and `code_map.json` (symbols, dependency graph, Python call graph, entry points,
 > hub modules). With an LLM configured it also writes `brief.json` / `brief.md`; until the
-> provider is chosen (decision D-001) that step is skipped. Every other agent is still a stub.
+> provider is chosen (decision D-001) that step is skipped. The `write_docs` stage turns that
+> analysis into `docs/README.md`, `SETUP.md` and `ARCHITECTURE.md` (folder tree, Mermaid
+> dependency graph, install/run steps that cite their manifest, env var names from
+> `.env.example`). Anything only the LLM brief could say is left as a visible
+> `TODO (author)`. Every other agent is still a stub.
 
 ## How it works
 
@@ -36,6 +40,7 @@ showcase run https://github.com/Achyut0617/NearbyConnect   # walks all stages, s
 showcase status jobs/nearbyconnect-<timestamp>
 showcase approve jobs/nearbyconnect-<timestamp>             # --by <name> to record the reviewer
 showcase resume jobs/nearbyconnect-<timestamp>              # finishes publish
+showcase docs jobs/nearbyconnect-<timestamp>                # re-write the docs pages only
 showcase list                                               # every job and where it stopped
 showcase --version
 ```

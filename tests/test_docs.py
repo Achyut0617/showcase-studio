@@ -260,3 +260,11 @@ def test_write_docs_stage_fails_clearly_without_analysis(tmp_path, sample_source
     job = Job.create(sample_source, tmp_path / "jobs")
     with pytest.raises(DocsError, match="run the analyze stage first"):
         WriteDocsStage().run(job)
+
+
+def test_nested_dockerfile_is_not_a_setup_step(tmp_path):
+    from showcase.docs import setup_steps
+
+    a = _analysis_with(tmp_path, {"Dockerfile": "FROM x\n", "sandbox/Dockerfile": "FROM y\n"})
+    cmds = [s.command for s in setup_steps(a)]
+    assert cmds == ["docker build -t app .", "docker run --rm app"]

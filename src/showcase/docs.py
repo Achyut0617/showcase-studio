@@ -153,6 +153,8 @@ _SIMPLE_STEPS = {
     "docker-compose.yaml": (None, "docker compose up"),
     "compose.yaml": (None, "docker compose up"),
 }
+_CONTAINER_FILES = frozenset({"Dockerfile", "docker-compose.yml", "docker-compose.yaml",
+                              "compose.yaml"})
 _NPM_SCRIPTS = ("dev", "start", "build", "test")
 
 
@@ -197,6 +199,8 @@ def setup_steps(analysis: Analysis) -> list[Step]:
             found = _npm_steps(analysis.repo, rel)
         elif name == "pyproject.toml":
             found = _pyproject_steps(analysis.repo, rel)
+        elif name in _CONTAINER_FILES and folder:
+            continue  # a nested Dockerfile is usually a helper image, not how to run the project
         elif name in _SIMPLE_STEPS:
             install, run = _SIMPLE_STEPS[name]
             found = [Step(c, rel, k) for c, k in ((install, "install"), (run, "run")) if c]
