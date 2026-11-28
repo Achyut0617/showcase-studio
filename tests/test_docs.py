@@ -43,3 +43,25 @@ def test_corrupt_code_map_names_the_file(tmp_path):
     (tmp_path / "code_map.json").write_text("{nope")
     with pytest.raises(DocsError, match="code_map.json"):
         load_analysis(tmp_path)
+
+
+def test_render_tree_folders_first_and_nested():
+    from showcase.docs import render_tree
+
+    out = render_tree(["README.md", "app/main.py", "app/db/models.py"])
+    assert out.splitlines() == [
+        "├── app/",
+        "│   ├── db/",
+        "│   │   └── models.py",
+        "│   └── main.py",
+        "└── README.md",
+    ]
+
+
+def test_render_tree_cuts_depth_and_size():
+    from showcase.docs import render_tree
+
+    deep = render_tree(["a/b/c/d/e.py"], max_depth=2)
+    assert "e.py" not in deep and "b/" in deep
+    big = render_tree([f"f{i:03}.py" for i in range(100)], max_entries=10)
+    assert big.splitlines()[-1] == "... 90 more"

@@ -59,3 +59,43 @@ def load_analysis(job_path: Path) -> Analysis:
     brief = _read_json(job_path / BRIEF_FILE, required=False)
     repo = job_path / ingest.get("repo_dir", "input/repo")
     return Analysis(ingest=ingest, code_map=code_map, brief=brief, repo=repo)
+
+
+def render_tree(paths: list[str], max_depth: int = 3, max_entries: int = 60) -> str:
+    """A ``tree``-style listing of repo paths, folders first, cut at a depth and size.
+
+    Deeper levels collapse into their folder; anything over ``max_entries`` is
+    summarised as ``... N more`` so huge repos still give a readable page.
+    """
+    root: dict = {}
+    for p in sorted(paths):
+        node = root
+        parts = p.split("/")
+        for i, part in enumerate(parts):
+            if i >= max_depth:
+                break
+            last = i == len(parts) - 1
+            node = node.setdefault(part, None if last else {})
+            if node is None:
+                break
+
+    lines: list[str] = []
+    hidden = 0
+
+    def walk(node: dict, prefix: str) -> None:
+        nonlocal hidden
+        items = sorted(node.items(), key=lambda kv: (kv[1] is None, kv[0].lower()))
+        for i, (name, child) in enumerate(items):
+            if len(lines) >= max_entries:
+                hidden += 1
+                continue
+            last = i == len(items) - 1
+            label = f"{name}/" if child is not None else name
+            lines.append(f"{prefix}{'└── ' if last else '├── '}{label}")
+            if child:
+                walk(child, prefix + ("    " if last else "│   "))
+
+    walk(root, "")
+    if hidden:
+        lines.append(f"... {hidden} more")
+    return "\n".join(lines)
