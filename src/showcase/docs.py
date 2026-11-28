@@ -313,7 +313,7 @@ def render_architecture(analysis: Analysis) -> str:
     if hubs:
         out += ["", "## Most-used modules", ""]
         for h in hubs:
-            doc = _first_line(cm.get("modules", {}).get(h["path"], {}).get("docstring"))
+            doc = _first_line(cm.get("modules", {}).get(h["path"], {}).get("doc"))
             out.append(f"- `{h['path']}` - imported by {h['used_by']}"
                        + (f": {doc}" if doc else ""))
     ext = cm.get("external_packages", {})

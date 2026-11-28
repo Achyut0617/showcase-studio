@@ -173,7 +173,7 @@ def test_render_architecture_from_code_map(tmp_path):
         "summary": {"modules": 2, "symbols": 4,
                     "entry_points": [{"path": "app/main.py", "why": "conventional name"}],
                     "hubs": [{"path": "app/db.py", "used_by": 1}]},
-        "modules": {"app/db.py": {"docstring": "Database access.\nMore."}},
+        "modules": {"app/db.py": {"doc": "Database access.\nMore."}},
         "dependencies": [{"from": "app/main.py", "to": "app/db.py"}],
         "external_packages": {"flask": 2},
     })
