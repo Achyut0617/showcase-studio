@@ -9,6 +9,7 @@ as a visible TODO for the author, never invented.
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -206,3 +207,28 @@ def setup_steps(analysis: Analysis) -> list[Step]:
                 step.command = f"cd {folder} && {step.command}"
             steps.append(step)
     return steps
+
+
+_ENV_TEMPLATE = re.compile(r"(^|/)\.?env(\.[\w-]+)?\.(example|sample|template|dist)$", re.I)
+_ENV_KEY = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
+
+
+def env_var_names(analysis: Analysis) -> dict[str, list[str]]:
+    """Variable names declared in .env.example-style templates, per template file.
+
+    Only names are returned - values are never copied into the docs, even from a
+    template, in case someone committed a real key there.
+    """
+    found: dict[str, list[str]] = {}
+    for f in analysis.ingest.get("files", []):
+        rel = f["path"]
+        if f.get("sensitive") or f.get("skipped") or not _ENV_TEMPLATE.search(rel):
+            continue
+        try:
+            text = (analysis.repo / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        names = [m.group(1) for line in text.splitlines() if (m := _ENV_KEY.match(line))]
+        if names:
+            found[rel] = list(dict.fromkeys(names))
+    return found

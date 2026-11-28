@@ -122,3 +122,19 @@ def test_setup_steps_pyproject_scripts_and_bad_files(tmp_path):
     })
     cmds = [s.command for s in setup_steps(a)]
     assert cmds == ["npm install", "pip install -e .", "tool --help"]
+
+
+def test_env_var_names_reads_names_not_values(tmp_path):
+    from showcase.docs import env_var_names
+
+    repo = tmp_path / "input" / "repo"
+    repo.mkdir(parents=True)
+    (repo / ".env.example").write_text("# comment\nAPI_KEY=sk-real-looking\nexport DB_URL=x\n"
+                                       "API_KEY=again\n")
+    (repo / ".env").write_text("SECRET=1\n")
+    files = [{"path": ".env.example", "sensitive": False, "skipped": None},
+             {"path": ".env", "sensitive": True, "skipped": None}]
+    write_analysis(tmp_path, ingest={"source": "x", "repo_dir": "input/repo", "files": files})
+    found = env_var_names(load_analysis(tmp_path))
+    assert found == {".env.example": ["API_KEY", "DB_URL"]}
+    assert "sk-real" not in json.dumps(found)
