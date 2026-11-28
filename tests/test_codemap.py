@@ -140,3 +140,25 @@ def test_backend_in_subfolder_resolves_its_own_top_level_imports(tmp_path):
     assert ("src/backend/main.py", "src/backend/db.py") in deps
     assert ("src/backend/services/matching.py", "src/backend/models/user.py") in deps
     assert {"services", "models", "db"}.isdisjoint(cm["external_packages"])
+
+
+def test_from_package_import_several_submodules_links_each(tmp_path):
+    from showcase.codemap import build_code_map
+    from showcase.ingest import scan_tree
+
+    files = {
+        "app/main.py": "from routers import area, people\n\n"
+                       "def boot():\n    area.mount()\n    people.mount()\n",
+        "app/routers/__init__.py": "",
+        "app/routers/area.py": "def mount():\n    pass\n",
+        "app/routers/people.py": "def mount():\n    pass\n",
+    }
+    for rel, text in files.items():
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text(text)
+    cm = build_code_map(tmp_path, scan_tree(tmp_path))
+    assert cm["modules"]["app/main.py"]["depends_on"] == [
+        "app/routers/area.py", "app/routers/people.py"]
+    calls = {(c["from"], c["to"]) for c in cm["calls"]}
+    assert ("app/main.py::boot", "app/routers/people.py::mount") in calls
+    assert ("app/main.py::boot", "app/routers/area.py::mount") in calls

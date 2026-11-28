@@ -108,16 +108,19 @@ def build_code_map(repo: Path, scan: dict) -> dict:
             if kind == "python":
                 name = python_module_name(f["path"])
                 is_pkg = f["path"].endswith("__init__.py")
-                for cand in resolve_import(imp, name, is_pkg):
-                    if cand in py_index:
-                        target = py_index[cand]
-                        break
+                cands = resolve_import(imp, name, is_pkg)
+                # `from pkg import a, b` can name several submodules: link every one
+                subs = [py_index[c] for c in cands[: len(imp["names"])] if c in py_index]
+                found = subs or [py_index[c] for c in cands[len(imp["names"]):]
+                                 if c in py_index][:1]
+                target = found[0] if found else None
+                imp["resolved_all"] = found
             else:
                 target = resolve_js_import(imp["module"], f["path"], existing)
             imp["resolved"] = target
-            if target and target != f["path"]:
-                deps.add(target)
-            elif not target:
+            if target:
+                deps.update(t for t in imp.get("resolved_all", [target]) if t != f["path"])
+            else:
                 ext = _external_name(imp, kind)
                 if ext:
                     external[ext] += 1
@@ -158,11 +161,14 @@ def _python_call_edges(path: str, mod: dict, modules: dict[str, dict]) -> set[tu
         if not target:
             continue
         if imp["names"]:
+            targets = imp.get("resolved_all") or [target]
             for n in imp["names"]:
-                if n in defined(target):
+                sub = next((t for t in targets
+                            if python_module_name(t).split(".")[-1] == n), None)
+                if sub:
+                    aliases[n] = (sub, None)
+                elif n in defined(target):
                     aliases[n] = (target, n)
-                elif python_module_name(target).endswith(n):
-                    aliases[n] = (target, None)
         else:
             aliases[imp["module"]] = (target, None)
 
