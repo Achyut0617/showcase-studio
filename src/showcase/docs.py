@@ -373,3 +373,28 @@ def render_all(analysis: Analysis) -> dict[str, str]:
         "ARCHITECTURE.md": render_architecture(analysis),
     }
     return {name: text + footer for name, text in pages.items()}
+
+
+DOCS_INDEX = "index.json"
+
+
+class WriteDocsStage:
+    """Writes README / SETUP / ARCHITECTURE into the job's docs/ folder plus an index."""
+
+    name = "write_docs"
+
+    def run(self, job) -> None:
+        analysis = load_analysis(job.path)
+        out_dir = job.path / "docs"
+        out_dir.mkdir(exist_ok=True)
+        pages = render_all(analysis)
+        index = {"used_brief": analysis.brief is not None, "pages": {}}
+        for name, text in pages.items():
+            (out_dir / name).write_text(text, encoding="utf-8")
+            index["pages"][name] = {"lines": text.count("\n"), "todos": text.count("TODO (author)")}
+        (out_dir / DOCS_INDEX).write_text(json.dumps(index, indent=2), encoding="utf-8")
+        todos = sum(p["todos"] for p in index["pages"].values())
+        log = [f"write_docs: wrote {', '.join(pages)} to docs/"]
+        log.append(f"write_docs: {todos} TODOs left for the author" if todos
+                   else "write_docs: no TODOs left")
+        (job.path / "logs" / f"{self.name}.log").write_text("\n".join(log) + "\n", "utf-8")

@@ -232,3 +232,31 @@ def test_footer_names_commit_and_brief_state(tmp_path):
     pages = render_all(a)
     assert set(pages) == {"README.md", "SETUP.md", "ARCHITECTURE.md"}
     assert all(p.endswith("Review before publishing._\n") for p in pages.values())
+
+
+def test_write_docs_stage_writes_pages_index_and_log(tmp_path, sample_source):
+    from datetime import datetime
+
+    from showcase.analyzer import AnalyzeStage
+    from showcase.docs import WriteDocsStage
+    from showcase.job import Job
+
+    job = Job.create(sample_source, tmp_path / "jobs", now=datetime(2026, 11, 30, 9, 0, 0))
+    AnalyzeStage().run(job)
+    WriteDocsStage().run(job)
+    for name in ("README.md", "SETUP.md", "ARCHITECTURE.md"):
+        assert (job.path / "docs" / name).read_text().strip()
+    index = json.loads((job.path / "docs" / "index.json").read_text())
+    assert index["used_brief"] is False
+    assert index["pages"]["README.md"]["todos"] >= 1
+    assert "TODOs left for the author" in (job.path / "logs" / "write_docs.log").read_text()
+    assert "app/main.py" in (job.path / "docs" / "ARCHITECTURE.md").read_text()
+
+
+def test_write_docs_stage_fails_clearly_without_analysis(tmp_path, sample_source):
+    from showcase.docs import WriteDocsStage
+    from showcase.job import Job
+
+    job = Job.create(sample_source, tmp_path / "jobs")
+    with pytest.raises(DocsError, match="run the analyze stage first"):
+        WriteDocsStage().run(job)
