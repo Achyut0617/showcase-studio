@@ -1,4 +1,4 @@
-"""Command line: showcase run | resume | status | approve | list."""
+"""Command line: showcase run | resume | status | approve | list | docs."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from showcase import __version__
+from showcase.docs import DocsError, WriteDocsStage
 from showcase.job import Job, JobError
 from showcase.orchestrator import approve, run_job
 from showcase.stages import STAGE_ORDER, default_stages
@@ -55,6 +56,7 @@ def _parser() -> argparse.ArgumentParser:
         ("resume", "continue a job from its first unfinished stage"),
         ("status", "show each stage's status"),
         ("approve", "approve a job for publishing"),
+        ("docs", "re-write the docs pages from the job's analysis (e.g. after editing brief.json)"),
     ):
         sp = sub.add_parser(name, help=help_text)
         sp.add_argument("job_dir", type=Path)
@@ -83,7 +85,10 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "approve":
                 approve(job, by=args.by)
                 print(f"approved by {args.by}: {job.path}")
-    except (JobError, ValueError) as exc:
+            elif args.command == "docs":
+                WriteDocsStage().run(job)
+                print((job.path / "logs" / "write_docs.log").read_text(encoding="utf-8"), end="")
+    except (JobError, DocsError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     return 1 if final == "failed" else 0

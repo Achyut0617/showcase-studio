@@ -95,3 +95,24 @@ def test_list_shows_where_each_job_stopped(tmp_path, capsys, sample_source):
 def test_list_empty_dir(tmp_path, capsys):
     assert main(["list", "--jobs-dir", str(tmp_path / "none")]) == 0
     assert "no jobs" in capsys.readouterr().out
+
+
+def test_docs_command_rewrites_pages(tmp_path, sample_source, capsys):
+    from showcase.analyzer import AnalyzeStage
+    from showcase.cli import main
+    from showcase.job import Job
+
+    job = Job.create(sample_source, tmp_path / "jobs")
+    AnalyzeStage().run(job)
+    assert main(["docs", str(job.path)]) == 0
+    assert "wrote README.md, SETUP.md, ARCHITECTURE.md" in capsys.readouterr().out
+    assert (job.path / "docs" / "SETUP.md").exists()
+
+
+def test_docs_command_before_analyze_is_a_clean_error(tmp_path, sample_source, capsys):
+    from showcase.cli import main
+    from showcase.job import Job
+
+    job = Job.create(sample_source, tmp_path / "jobs")
+    assert main(["docs", str(job.path)]) == 2
+    assert "ingest.json not found" in capsys.readouterr().err
