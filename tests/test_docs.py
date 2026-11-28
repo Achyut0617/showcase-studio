@@ -85,3 +85,40 @@ def test_dependency_diagram_none_without_imports_and_caps_nodes():
     out = dependency_diagram({"dependencies": deps}, max_nodes=5)
     assert out.count('"]') == 5
     assert "26 less-connected modules" in out
+
+
+def _analysis_with(tmp_path, files: dict[str, str]):
+    repo = tmp_path / "input" / "repo"
+    for rel, text in files.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text)
+    write_analysis(tmp_path, ingest={"source": "x", "repo_dir": "input/repo",
+                                     "manifests": sorted(files), "files": []})
+    return load_analysis(tmp_path)
+
+
+def test_setup_steps_from_package_json_and_requirements(tmp_path):
+    from showcase.docs import setup_steps
+
+    a = _analysis_with(tmp_path, {
+        "requirements.txt": "flask\n",
+        "web/package.json": json.dumps({"scripts": {"dev": "vite", "test": "vitest"}}),
+    })
+    cmds = [(s.command, s.source, s.kind) for s in setup_steps(a)]
+    assert cmds == [
+        ("pip install -r requirements.txt", "requirements.txt", "install"),
+        ("cd web && npm install", "web/package.json", "install"),
+        ("cd web && npm run dev", "web/package.json", "run"),
+        ("cd web && npm run test", "web/package.json", "test"),
+    ]
+
+
+def test_setup_steps_pyproject_scripts_and_bad_files(tmp_path):
+    from showcase.docs import setup_steps
+
+    a = _analysis_with(tmp_path, {
+        "pyproject.toml": '[project]\nname="x"\n[project.scripts]\ntool = "x.cli:main"\n',
+        "package.json": "{broken",
+    })
+    cmds = [s.command for s in setup_steps(a)]
+    assert cmds == ["npm install", "pip install -e .", "tool --help"]

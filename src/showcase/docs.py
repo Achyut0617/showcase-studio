@@ -9,6 +9,7 @@ as a visible TODO for the author, never invented.
 from __future__ import annotations
 
 import json
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -129,3 +130,79 @@ def dependency_diagram(code_map: dict, max_nodes: int = 25) -> str | None:
     if dropped:
         lines.append(f"\n_{dropped} less-connected modules left out of the diagram._")
     return "\n".join(lines)
+
+
+# manifest file name -> (install step, run step or None)
+_SIMPLE_STEPS = {
+    "requirements.txt": ("pip install -r requirements.txt", None),
+    "Pipfile": ("pipenv install", None),
+    "environment.yml": ("conda env create -f environment.yml", None),
+    "go.mod": ("go mod download", "go run ."),
+    "Cargo.toml": ("cargo build", "cargo run"),
+    "pom.xml": ("mvn package", None),
+    "build.gradle": ("./gradlew build", None),
+    "build.gradle.kts": ("./gradlew build", None),
+    "CMakeLists.txt": ("cmake -S . -B build && cmake --build build", None),
+    "platformio.ini": ("pio run", "pio run --target upload"),
+    "Gemfile": ("bundle install", None),
+    "composer.json": ("composer install", None),
+    "pubspec.yaml": ("flutter pub get", "flutter run"),
+    "Dockerfile": ("docker build -t app .", "docker run --rm app"),
+    "docker-compose.yml": (None, "docker compose up"),
+    "docker-compose.yaml": (None, "docker compose up"),
+    "compose.yaml": (None, "docker compose up"),
+}
+_NPM_SCRIPTS = ("dev", "start", "build", "test")
+
+
+@dataclass
+class Step:
+    command: str
+    source: str  # the manifest the step was read from
+    kind: str  # "install" | "run" | "test"
+
+
+def _npm_steps(repo: Path, rel: str) -> list[Step]:
+    steps = [Step("npm install", rel, "install")]
+    try:
+        scripts = json.loads((repo / rel).read_text(encoding="utf-8")).get("scripts") or {}
+    except (ValueError, OSError, AttributeError):
+        scripts = {}
+    for name in _NPM_SCRIPTS:
+        if name in scripts:
+            cmd = "npm start" if name == "start" else f"npm run {name}"
+            steps.append(Step(cmd, rel, "test" if name == "test" else "run"))
+    return steps
+
+
+def _pyproject_steps(repo: Path, rel: str) -> list[Step]:
+    steps = [Step("pip install -e .", rel, "install")]
+    try:
+        data = tomllib.loads((repo / rel).read_text(encoding="utf-8"))
+    except (tomllib.TOMLDecodeError, OSError):
+        return steps
+    for name in sorted(data.get("project", {}).get("scripts", {})):
+        steps.append(Step(f"{name} --help", rel, "run"))
+    return steps
+
+
+def setup_steps(analysis: Analysis) -> list[Step]:
+    """Install / run / test commands backed by a manifest; root manifests first."""
+    manifests = sorted(analysis.ingest.get("manifests", []), key=lambda m: (m.count("/"), m))
+    steps: list[Step] = []
+    for rel in manifests:
+        folder, _, name = rel.rpartition("/")
+        if name == "package.json":
+            found = _npm_steps(analysis.repo, rel)
+        elif name == "pyproject.toml":
+            found = _pyproject_steps(analysis.repo, rel)
+        elif name in _SIMPLE_STEPS:
+            install, run = _SIMPLE_STEPS[name]
+            found = [Step(c, rel, k) for c, k in ((install, "install"), (run, "run")) if c]
+        else:
+            continue
+        for step in found:
+            if folder:
+                step.command = f"cd {folder} && {step.command}"
+            steps.append(step)
+    return steps
